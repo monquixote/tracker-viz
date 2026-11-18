@@ -1,0 +1,10 @@
+node_modules/
+dist/
+test-project/
+.DS_Store
+*.local
+.env
+.env.*
+*.mp4
+*.webm
+*.wav
