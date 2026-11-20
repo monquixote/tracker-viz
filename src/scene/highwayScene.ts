@@ -15,15 +15,109 @@ import { NoteHighway } from './noteHighway.ts';
 import { PatternGantries } from './patternGantries.ts';
 import { StrikeZone } from './strikeZone.ts';
 
-const CAMERA_PRESETS: Record<
-  CameraPreset,
-  { pos: [number, number, number]; lookAt: [number, number, number]; fov: number }
-> = {
-  classic: { pos: [0, 8.2, 10.5], lookAt: [0, 0.2, -14], fov: 50 },
-  low: { pos: [0, 4.4, 8.2], lookAt: [0, 0.6, -18], fov: 56 },
-  top: { pos: [0, 18.5, 4.5], lookAt: [0, 0, -10], fov: 46 },
-  side: { pos: [11.5, 7.2, 9.0], lookAt: [-1.5, 0.2, -12], fov: 48 },
+type StaticCameraPreset = 'classic' | 'low' | 'top' | 'side';
+type DynamicCameraPreset = Exclude<CameraPreset, StaticCameraPreset>;
+
+interface CameraPose {
+  pos: [number, number, number];
+  lookAt: [number, number, number];
+  fov: number;
+}
+
+const STATIC_CAMERA_PRESETS: Record<StaticCameraPreset, CameraPose> = {
+  classic: { pos: [0, 8.3, 11.6], lookAt: [0, 0.2, -14], fov: 51 },
+  low: { pos: [0, 4.6, 9.6], lookAt: [0, 0.55, -17], fov: 54 },
+  top: { pos: [0, 20.0, 6.4], lookAt: [0, 0, -6.5], fov: 48 },
+  side: { pos: [12.2, 7.6, 10.4], lookAt: [-1.0, 0.2, -11.5], fov: 48 },
 };
+
+function smootherstep01(t: number): number {
+  const c = Math.max(0, Math.min(1, t));
+  return c * c * c * (c * (c * 6 - 15) + 10);
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function isStaticCameraPreset(preset: CameraPreset): preset is StaticCameraPreset {
+  return preset in STATIC_CAMERA_PRESETS;
+}
+
+function evaluateDynamicCameraPose(
+  preset: DynamicCameraPreset,
+  timeSec: number,
+  gridStepFloat: number,
+  songRow: number,
+  stepInRow: number,
+  rowSteps: number
+): CameraPose {
+  switch (preset) {
+    case 'orbit': {
+      const phase = timeSec * ((Math.PI * 2) / 18);
+      const s = Math.sin(phase);
+      const absS = Math.abs(s);
+      return {
+        pos: [s * 8.2, 7.6 + absS * 1.1, 11.8 + absS * 0.6],
+        lookAt: [-s * 0.85, 0.25, -12.5 - (1 - absS) * 1.2],
+        fov: 51,
+      };
+    }
+    case 'drift': {
+      const p = (gridStepFloat / 128) * Math.PI * 2;
+      const x = Math.sin(p) * 5.6;
+      const y = 8.4 + Math.sin(p * 2) * 1.0;
+      const z = 12.6 + Math.cos(p) * 0.7;
+      return {
+        pos: [x, y, z],
+        lookAt: [-x * 0.1, 0.2 + Math.cos(p * 2) * 0.15, -11.8],
+        fov: 51 + Math.sin(p) * 1.4,
+      };
+    }
+    case 'drone': {
+      const p = timeSec * ((Math.PI * 2) / 14);
+      const s = Math.sin(p);
+      return {
+        pos: [s * 5.0, 4.9 + Math.cos(p * 2) * 0.5, 10.6 + Math.abs(s) * 0.6],
+        lookAt: [-s * 0.9, 0.55, -15.2],
+        fov: 54,
+      };
+    }
+    case 'crane': {
+      const p = (gridStepFloat / 192) * Math.PI * 2;
+      const s = Math.sin(p);
+      const centerAmt = 1 - Math.abs(s);
+      return {
+        pos: [s * 11.2, 8.0 + centerAmt * 4.4, 11.8 + centerAmt * 1.6],
+        lookAt: [-s * 0.85, 0.1, -10.2 - centerAmt * 1.0],
+        fov: 50,
+      };
+    }
+    case 'sweep': {
+      const classic = STATIC_CAMERA_PRESETS.classic;
+      const side = STATIC_CAMERA_PRESETS.side;
+      const transitionSteps = Math.min(16, Math.max(6, rowSteps * 0.25));
+      const progress = smootherstep01(stepInRow / transitionSteps);
+      // Row 0 starts and holds on Classic; odd rows sweep Classic -> Side and hold;
+      // subsequent even rows sweep Side -> Classic and hold.
+      const b = songRow === 0 ? 0 : songRow % 2 === 1 ? progress : 1 - progress;
+      const arcZ = Math.sin(b * Math.PI) * 1.4;
+      return {
+        pos: [
+          lerp(classic.pos[0], side.pos[0], b),
+          lerp(classic.pos[1], side.pos[1], b),
+          lerp(classic.pos[2], side.pos[2], b) + arcZ,
+        ],
+        lookAt: [
+          lerp(classic.lookAt[0], side.lookAt[0], b),
+          lerp(classic.lookAt[1], side.lookAt[1], b),
+          lerp(classic.lookAt[2], side.lookAt[2], b),
+        ],
+        fov: lerp(classic.fov, side.fov, b),
+      };
+    }
+  }
+}
 
 export class HighwayScene {
   public readonly renderer: THREE.WebGLRenderer;
@@ -42,6 +136,7 @@ export class HighwayScene {
   private layout: LaneLayout;
   private timeline: CompiledTimeline | null = null;
   private laneMode: LaneMode = 'auto';
+  private cameraPreset: CameraPreset = 'classic';
   private bgColor = new THREE.Color('#05070e');
 
   constructor(container: HTMLElement) {
@@ -128,12 +223,41 @@ export class HighwayScene {
     this.patternGantries.setDisplayMode(mode);
   }
 
+  private applyCameraPose(pose: CameraPose): void {
+    this.camera.position.set(...pose.pos);
+    this.camera.lookAt(...pose.lookAt);
+    if (Math.abs(this.camera.fov - pose.fov) > 1e-4) {
+      this.camera.fov = pose.fov;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
   public setCameraPreset(preset: CameraPreset): void {
-    const cfg = CAMERA_PRESETS[preset];
-    this.camera.fov = cfg.fov;
-    this.camera.position.set(...cfg.pos);
-    this.camera.lookAt(...cfg.lookAt);
-    this.camera.updateProjectionMatrix();
+    this.cameraPreset = preset;
+    if (isStaticCameraPreset(preset)) {
+      this.applyCameraPose(STATIC_CAMERA_PRESETS[preset]);
+    } else {
+      this.applyCameraPose(evaluateDynamicCameraPose(preset, 0, 0, 0, 0, 32));
+    }
+  }
+
+  private updateCamera(frame: FrameState): void {
+    if (isStaticCameraPreset(this.cameraPreset)) return;
+    const currRow = this.timeline?.songRows[frame.songRow];
+    const stepInRow = currRow
+      ? Math.max(0, frame.gridStepFloat - currRow.startStepFloat)
+      : frame.stepIndex + frame.stepProgress;
+    const rowSteps = currRow?.stepCount || 32;
+    this.applyCameraPose(
+      evaluateDynamicCameraPose(
+        this.cameraPreset,
+        frame.timeSec,
+        frame.gridStepFloat,
+        frame.songRow,
+        stepInRow,
+        rowSteps
+      )
+    );
   }
 
   public setTransparentBackground(transparent: boolean): void {
@@ -193,11 +317,12 @@ export class HighwayScene {
     }
 
     const totalSteps = this.timeline?.totalSteps ?? 128;
-    this.laneGrid.update(frame.gridStepFloat, frame.activeMutes, totalSteps, analysis);
+    this.laneGrid.update(frame.gridStepFloat, totalSteps, analysis);
     this.noteHighway.update(frame, this.layout);
     this.strikeZone.update(dt);
     this.patternGantries.update(frame, this.timeline?.songRows ?? [], dt);
     this.backdropManager.update(analysis, dt);
+    this.updateCamera(frame);
 
     this.renderer.render(this.scene, this.camera);
   }

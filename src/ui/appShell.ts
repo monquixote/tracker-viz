@@ -57,6 +57,7 @@ export class AppShell {
   private progressWrapEl: HTMLElement;
   private progressFillEl: HTMLElement;
   private cancelExportBtn: HTMLButtonElement;
+  private helpDialog: HTMLDialogElement;
 
   private isScrubbing = false;
   private callbacks: AppShellCallbacks;
@@ -108,6 +109,11 @@ export class AppShell {
               <option value="low">Low Action</option>
               <option value="top">Top-Down</option>
               <option value="side">Side Sweep</option>
+              <option value="orbit">Cinema Orbit</option>
+              <option value="drift">Bar Drift</option>
+              <option value="sweep">Classic ↔ Side</option>
+              <option value="drone">Low Drone</option>
+              <option value="crane">Side-to-Side Crane</option>
             </select>
           </div>
 
@@ -147,6 +153,7 @@ export class AppShell {
           <button class="btn btn-danger" data-role="live-rec">● LIVE REC</button>
           <button class="btn" data-role="export-mp4">EXPORT MP4</button>
           <button class="btn" data-role="export-webm">EXPORT WEBM</button>
+          <button class="btn" data-role="help-btn" title="How to use tracker-viz (?)">? HELP</button>
         </div>
       </div>
 
@@ -188,6 +195,54 @@ export class AppShell {
         </div>
       </div>
 
+      <dialog class="help-dialog" data-role="help-dialog" closedby="any" aria-labelledby="help-dialog-title">
+        <div class="help-header">
+          <h2 id="help-dialog-title" class="help-dialog-title">TRACKER-VIZ — HOW TO USE</h2>
+          <form method="dialog">
+            <button type="submit" class="btn" aria-label="Close help" autofocus>✕</button>
+          </form>
+        </div>
+        <div class="help-body">
+          <div class="help-note">
+            <strong>100% Local-First:</strong> Parsing, audio analysis, WebGL rendering, and video encoding happen locally in your browser — files are never uploaded. Supports <strong>Polyend Tracker, Tracker Mini, Tracker+, and Tracker-CE</strong> (6-byte &amp; 8-byte patterns, Swing FX <code>I</code>, and Micro-move <code>m</code>). Use <strong>Chrome or Edge</strong> for <code>MOUNT TRACKER</code>, 1080p MP4/WebM export, and Web MIDI Sync.
+          </div>
+
+          <section class="help-section">
+            <h3>QUICK START</h3>
+            <ol class="help-steps">
+              <li><strong>Export your audio:</strong> Render your master <code>.wav</code> on the Tracker (into <code>/Export/</code> or inside your project folder).</li>
+              <li><strong>Load a project:</strong> Click <strong>MOUNT TRACKER</strong> (Chrome/Edge) to select your SD card root or <code>/Projects</code> folder, then use <strong>PROJECTS</strong> or <strong>LOAD LATEST</strong> — or use <strong>OPEN FOLDER</strong> + <strong>LOAD WAV</strong> for a single project folder.</li>
+              <li><strong>Sync playback:</strong> Press <strong>Space</strong> or <strong>▶ PLAY</strong>. If your WAV has leading silence, click <strong>AUTO</strong> or fine-tune <strong>OFFSET</strong> (<code>-300ms</code> to <code>+300ms</code>).</li>
+              <li><strong>Customize &amp; label:</strong> Adjust <strong>LANES</strong>, <strong>CAM</strong> (including panning modes like <code>Classic ↔ Side</code> and <code>Cinema Orbit</code>), <strong>BACKDROP</strong>, and <strong>SECTIONS</strong>. Click <strong>NAMES</strong> to rename tracks and patterns (saved in browser storage).</li>
+              <li><strong>Clean preview &amp; export:</strong> Press <strong>H</strong> (or <strong>HIDE UI</strong>) to preview the clean render. Click <strong>EXPORT MP4</strong> <em>(recommended)</em> for 1920×1080 60fps H.264/AAC video with HUD, <strong>EXPORT WEBM</strong> for VP9/Opus, or <strong>ALPHA</strong> + <strong>● LIVE REC</strong> for transparent <code>.webm</code> overlays.</li>
+            </ol>
+          </section>
+
+          <section class="help-section">
+            <h3>LIVE WEB MIDI SYNC</h3>
+            <p class="help-text">
+              Connect your Tracker via USB/MIDI, enable <strong>MIDI Clock Out</strong> and <strong>Transport Out</strong> on the Tracker, click <strong>MIDI SYNC</strong>, choose your input (or <code>All MIDI Inputs</code>), and start playback from <strong>Song Row 01</strong>.
+            </p>
+          </section>
+
+          <section class="help-section">
+            <h3>KEYBOARD SHORTCUTS</h3>
+            <div class="help-shortcuts">
+              <div class="help-shortcut"><kbd>Space</kbd><span>Play / Pause</span></div>
+              <div class="help-shortcut"><kbd>H</kbd><span>Toggle Hide / Show UI</span></div>
+              <div class="help-shortcut"><kbd>?</kbd><span>Open / Close Help</span></div>
+              <div class="help-shortcut"><kbd>Esc</kbd><span>Close modal</span></div>
+            </div>
+          </section>
+        </div>
+        <div class="help-footer">
+          <a class="help-link" href="https://github.com/monquixote/tracker-viz" target="_blank" rel="noopener noreferrer">GitHub Repo &amp; Docs ↗</a>
+          <form method="dialog">
+            <button type="submit" class="btn btn-primary">CLOSE</button>
+          </form>
+        </div>
+      </dialog>
+
       <input type="file" webkitdirectory directory multiple style="display:none" data-role="folder-input" />
       <input type="file" accept=".wav,audio/wav" style="display:none" data-role="wav-input" />
     `;
@@ -209,6 +264,7 @@ export class AppShell {
     this.progressWrapEl = this.root.querySelector('[data-role="progress-wrap"]')!;
     this.progressFillEl = this.root.querySelector('[data-role="progress-fill"]')!;
     this.cancelExportBtn = this.root.querySelector('[data-role="cancel-export"]')!;
+    this.helpDialog = this.root.querySelector<HTMLDialogElement>('[data-role="help-dialog"]')!;
 
     const folderInput = this.root.querySelector<HTMLInputElement>('[data-role="folder-input"]')!;
     const wavInput = this.root.querySelector<HTMLInputElement>('[data-role="wav-input"]')!;
@@ -334,6 +390,24 @@ export class AppShell {
     this.offlineMp4Btn.addEventListener('click', () => this.callbacks.onOfflineExport('mp4'));
     this.offlineWebmBtn.addEventListener('click', () => this.callbacks.onOfflineExport('webm'));
     this.cancelExportBtn.addEventListener('click', () => this.callbacks.onCancelOfflineExport());
+    this.root.querySelector('[data-role="help-btn"]')!.addEventListener('click', () => this.showHelp());
+
+    // Fallback light-dismiss for browsers without native <dialog closedby="any"> (e.g., Safari)
+    if (!('closedBy' in HTMLDialogElement.prototype)) {
+      const isOutside = (e: PointerEvent) => {
+        const r = this.helpDialog.getBoundingClientRect();
+        return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+      };
+      let pressedOutside = false;
+      this.helpDialog.addEventListener('pointerdown', (e) => {
+        pressedOutside = isOutside(e);
+      });
+      this.helpDialog.addEventListener('pointerup', (e) => {
+        if (pressedOutside && isOutside(e)) {
+          this.helpDialog.close();
+        }
+      });
+    }
   }
 
   public setTimeline(timeline: CompiledTimeline | null): void {
@@ -573,5 +647,23 @@ export class AppShell {
 
   public hidePatternNamesEditor(): void {
     this.root.querySelector('[data-role="names-modal"]')?.classList.remove('visible');
+  }
+
+  public showHelp(): void {
+    if (!this.helpDialog.open) {
+      this.helpDialog.showModal();
+    }
+  }
+
+  public toggleHelp(): void {
+    if (this.helpDialog.open) {
+      this.helpDialog.close();
+    } else {
+      this.helpDialog.showModal();
+    }
+  }
+
+  public isHelpOpen(): boolean {
+    return this.helpDialog.open;
   }
 }

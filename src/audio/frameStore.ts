@@ -8,7 +8,6 @@ import type {
 
 export class FrameStateStore {
   private timeline: CompiledTimeline | null = null;
-  private activeMutes: boolean[] = new Array<boolean>(16).fill(false);
   private prevTimeSec = -1;
   private prevGridStep = -1;
 
@@ -16,27 +15,10 @@ export class FrameStateStore {
     this.timeline = timeline;
     this.prevTimeSec = -1;
     this.prevGridStep = -1;
-    this.activeMutes = new Array<boolean>(16).fill(false);
   }
 
   public getTimeline(): CompiledTimeline | null {
     return this.timeline;
-  }
-
-  public toggleMute(trackIndex: number): void {
-    if (trackIndex >= 0 && trackIndex < 16) {
-      this.activeMutes[trackIndex] = !this.activeMutes[trackIndex];
-    }
-  }
-
-  public setMute(trackIndex: number, muted: boolean): void {
-    if (trackIndex >= 0 && trackIndex < 16) {
-      this.activeMutes[trackIndex] = muted;
-    }
-  }
-
-  public getMutes(): boolean[] {
-    return this.activeMutes;
   }
 
   public resetPrevTime(timeSec = -1): void {
@@ -95,7 +77,6 @@ export class FrameStateStore {
         stepProgress: 0,
         gridStepFloat: 0,
         bpm: 120,
-        activeMutes: this.activeMutes,
         visibleNotes: [],
         justTriggeredNotes: [],
         activeFxBadges: [],
@@ -140,8 +121,7 @@ export class FrameStateStore {
           if (
             n.triggerTimeSec > prev &&
             n.triggerTimeSec <= clampedTime &&
-            n.kind === 'note' &&
-            !this.activeMutes[n.trackIndex]
+            n.kind === 'note'
           ) {
             justTriggeredNotes.push(n);
           }
@@ -167,7 +147,6 @@ export class FrameStateStore {
       stepProgress,
       gridStepFloat,
       bpm: currentStep.bpm,
-      activeMutes: this.activeMutes,
       visibleNotes,
       justTriggeredNotes,
       activeFxBadges,
@@ -216,8 +195,7 @@ export class FrameStateStore {
           if (
             n.gridStepFloat > prev &&
             n.gridStepFloat <= gridStepFloat &&
-            n.kind === 'note' &&
-            !this.activeMutes[n.trackIndex]
+            n.kind === 'note'
           ) {
             justTriggeredNotes.push(n);
           }
@@ -242,7 +220,6 @@ export class FrameStateStore {
       stepProgress,
       gridStepFloat,
       bpm: measuredBpm && measuredBpm > 20 ? measuredBpm : currentStep.bpm,
-      activeMutes: this.activeMutes,
       visibleNotes,
       justTriggeredNotes,
       activeFxBadges,

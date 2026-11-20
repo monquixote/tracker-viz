@@ -39,7 +39,6 @@ export class NoteHighway {
   private dummy = new THREE.Object3D();
   private tempColor = new THREE.Color();
   private cellTriggerColor = new THREE.Color('#22c55e');
-  private cellMutedColor = new THREE.Color('#1e293b');
   private offCellColor = new THREE.Color('#475569');
 
   private createPixelBlockTexture(): THREE.CanvasTexture {
@@ -132,7 +131,7 @@ export class NoteHighway {
       });
       const pill = new THREE.Mesh(pillGeo.clone(), pillMat);
       pill.rotation.x = -Math.PI / 2;
-      pill.position.set(x, 0.02, 1.35);
+      pill.position.set(x, 0.02, 1.10);
       this.headerGroup.add(pill);
 
       const header = new Text();
@@ -146,7 +145,7 @@ export class NoteHighway {
       header.anchorX = 'center';
       header.anchorY = 'middle';
       header.rotation.x = -Math.PI / 2;
-      header.position.set(x, 0.04, 1.35);
+      header.position.set(x, 0.04, 1.10);
       header.sync();
       this.headerGroup.add(header);
     }
@@ -182,9 +181,8 @@ export class NoteHighway {
       }
 
       const z = -deltaSteps * STEP_Z_SPACING;
-      const isMuted = frame.activeMutes[note.trackIndex] ?? false;
       const isTriggering =
-        frame.isPlaying && deltaSteps <= 0.18 && deltaSteps >= -0.18 && note.kind === 'note' && !isMuted;
+        frame.isPlaying && deltaSteps <= 0.18 && deltaSteps >= -0.18 && note.kind === 'note';
       const consumeScale = deltaSteps < 0 ? Math.max(0, 1 + deltaSteps / 0.18) : 1;
 
       const blockHeight = (note.kind === 'note' ? 0.36 : 0.16) * consumeScale;
@@ -205,9 +203,7 @@ export class NoteHighway {
         this.dummy.scale.set(cellWidth * consumeScale, blockHeight, depthScale);
         this.dummy.updateMatrix();
 
-        if (isMuted) {
-          this.tempColor.copy(this.cellMutedColor);
-        } else if (isTriggering) {
+        if (isTriggering) {
           this.tempColor.copy(this.cellTriggerColor);
         } else if (note.kind !== 'note') {
           this.tempColor.copy(this.offCellColor);
@@ -221,7 +217,7 @@ export class NoteHighway {
       }
 
       // 2. Queue crisp centered pixel-retro Note text on top of the block
-      if (deltaSteps >= -0.05 && deltaSteps <= 22 && !isMuted) {
+      if (deltaSteps >= -0.05 && deltaSteps <= 22) {
         labelCandidates.push({
           x,
           y: blockHeight + 0.015,

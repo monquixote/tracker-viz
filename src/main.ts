@@ -57,10 +57,7 @@ async function bootstrap(): Promise<void> {
     idleCooldownSec = Math.max(idleCooldownSec, cooldown);
   };
 
-  const hud = new HudOverlay((trackIndex) => {
-    frameStore.toggleMute(trackIndex);
-    markDirty();
-  });
+  const hud = new HudOverlay();
 
   const midiAdapter = new MidiClockAdapter({
     onInputsChanged: (inputs) => {
@@ -467,10 +464,22 @@ async function bootstrap(): Promise<void> {
     shell.hideToast();
   }
 
-  // Keyboard shortcuts: Space (Play/Pause), H (Hide/Show UI)
+  // Keyboard shortcuts: Space (Play/Pause), H (Hide/Show UI), ? (Help)
   window.addEventListener('keydown', (e) => {
     const target = e.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT')) return;
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')
+    ) {
+      return;
+    }
+    if (e.key === '?') {
+      e.preventDefault();
+      shell.toggleHelp();
+      return;
+    }
+    if (shell.isHelpOpen()) return;
+
     if (e.code === 'Space') {
       e.preventDefault();
       if (audioEngine.isPlaying()) audioEngine.pause();

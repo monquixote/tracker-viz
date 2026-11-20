@@ -22,11 +22,10 @@ A local-first, zero-backend 3D note-highway visualizer and 60fps video exporter 
   - Manual **`OFFSET`** slider (`-300ms` to `+300ms`) plus one-click **`AUTO`** transient alignment to lock playback to exported audio.
 - **Customizable Visuals:**
   - **`LANES`:** `Auto`, `8`, `12`, or `16` lanes.
-  - **`CAM`:** `Classic`, `Low Action`, `Top-Down`, `Side Sweep`.
+  - **`CAM`:** `Classic`, `Low Action`, `Top-Down`, `Side Sweep`, plus panning modes `Cinema Orbit`, `Bar Drift`, `Classic ↔ Side`, `Low Drone`, and `Side-to-Side Crane`.
   - **`BACKDROP`:** `Outrun Sun`, `Joy Division`, `Demoscene`, `Hyperspace`, `Oscilloscope`, `Plasma Cloud`, `None`.
   - **`SECTIONS`:** `Gantries`, `Fly-Through Laser`, `Chromatic Slam`, `None`.
   - **`NAMES`:** Edit track labels and pattern section titles (saved per project in browser `localStorage`).
-  - **Track Mutes:** Click tracks in the top-left HUD to mute/unmute lane visuals.
   - **Clean View:** Click **`HIDE UI`** or press `H` to show only the highway and top-left telemetry HUD.
 - **Live Web MIDI Sync (`MIDI SYNC`):** Sync visuals to Polyend Tracker MIDI Start (`0xFA`), Continue (`0xFB`), Stop (`0xFC`), and 24-PPQN Clock (`0xF8`).
 - **60fps Video Export:**
@@ -57,6 +56,7 @@ A local-first, zero-backend 3D note-highway visualizer and 60fps video exporter 
 | --- | --- |
 | `Space` | Play / Pause |
 | `H` | Toggle Hide / Show UI (`HIDE UI` / `SHOW UI`) |
+| `?` | Open / Close Help |
 
 ---
 

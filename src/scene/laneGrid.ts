@@ -9,7 +9,7 @@ import {
   type LaneLayout,
 } from './constants.ts';
 
-const NEAR_Z_CAP = 1.35; // Terminate road right under the track name tabs
+const NEAR_Z_CAP = 1.10; // Terminate road right under the track name tabs
 
 export class LaneGrid {
   public readonly group = new THREE.Group();
@@ -22,7 +22,6 @@ export class LaneGrid {
   private sideGlowMeshes: THREE.Mesh[] = [];
   private laneFloorGroup = new THREE.Group();
   private laneFloorMeshes: THREE.Mesh[] = [];
-  private laneTrackIndices: number[] = [];
 
   private stepLineInstanced: THREE.InstancedMesh;
   private maxStepLines = LOOKAHEAD_STEPS + PAST_STEPS + 4;
@@ -106,7 +105,6 @@ export class LaneGrid {
     this.outerRailMeshes = [];
     this.sideGlowMeshes = [];
     this.laneFloorMeshes = [];
-    this.laneTrackIndices = [];
 
     // Lane dividers (count + 1 rails, unit Z length = 1)
     const railGeo = new THREE.BoxGeometry(0.035, 0.03, 1);
@@ -174,14 +172,12 @@ export class LaneGrid {
       strip.position.set(layout.getLaneX(i), -0.01, 0);
       this.laneFloorGroup.add(strip);
       this.laneFloorMeshes.push(strip);
-      this.laneTrackIndices.push(trkIdx);
     }
     stripGeo.dispose();
   }
 
   public update(
     gridStepFloat: number,
-    activeMutes: boolean[],
     totalSteps: number,
     analysis: AudioAnalysisFrame | null = null
   ): void {
@@ -276,14 +272,6 @@ export class LaneGrid {
     this.stepLineInstanced.instanceMatrix.needsUpdate = true;
     if (this.stepLineInstanced.instanceColor) {
       this.stepLineInstanced.instanceColor.needsUpdate = true;
-    }
-
-    // Update mute dimming on lane floors
-    for (let i = 0; i < this.laneFloorMeshes.length; i++) {
-      const trkIdx = this.laneTrackIndices[i]!;
-      const isMuted = activeMutes[trkIdx] ?? false;
-      const mat = this.laneFloorMeshes[i]!.material as THREE.MeshBasicMaterial;
-      mat.opacity = isMuted ? 0.002 : 0.015;
     }
   }
 }

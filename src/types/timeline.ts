@@ -13,7 +13,16 @@ export type BackdropMode =
 
 export type PatternDisplayMode = 'gantries' | 'marquee' | 'chromatic' | 'none';
 
-export type CameraPreset = 'classic' | 'low' | 'top' | 'side';
+export type CameraPreset =
+  | 'classic'
+  | 'low'
+  | 'top'
+  | 'side'
+  | 'orbit'
+  | 'drift'
+  | 'sweep'
+  | 'drone'
+  | 'crane';
 
 export interface FXBadge {
   symbol: string;
@@ -121,7 +130,6 @@ export interface FrameState {
   /** Continuous step position along the song timeline */
   gridStepFloat: number;
   bpm: number;
-  activeMutes: boolean[];
   /** Notes within the visible Z-window [pastBuffer .. lookahead] */
   visibleNotes: NoteEvent[];
   /** Notes that crossed the trigger line between previous frame and this frame */
