@@ -55,33 +55,85 @@ const OUTRUN_SUN_FRAG = /* glsl */ `
   }
 `;
 
-const DEMOSCENE_FRAG = /* glsl */ `
+const DEMOSCENE_TUNNEL_FRAG = /* glsl */ `
   uniform float uTime;
+  uniform float uScroll;
   uniform float uBass;
   uniform float uMid;
   uniform float uHigh;
   uniform float uRms;
+  uniform float uBands[16];
   varying vec2 vUv;
 
+  float sampleTunnelBand(float norm) {
+    float idxF = clamp(norm * 15.0, 0.0, 14.999);
+    int i0 = int(floor(idxF));
+    int i1 = min(15, i0 + 1);
+    float frac = fract(idxF);
+    float v0 = 0.0;
+    float v1 = 0.0;
+    for (int k = 0; k < 16; k++) {
+      if (k == i0) v0 = uBands[k];
+      if (k == i1) v1 = uBands[k];
+    }
+    return mix(v0, v1, smoothstep(0.0, 1.0, frac));
+  }
+
   void main() {
-    // Calm, moody pixel-quantized backdrop so the 3D wireframe shapes stay the hero
-    vec2 grid = vec2(72.0, 36.0);
-    vec2 uv = floor(vUv * grid) / grid;
-    vec2 p = uv * 2.0 - 1.0;
-    p.x *= 2.0;
+    // Full-resolution hairline 1/r polar tunnel with exact fwidth anti-aliasing
+    vec2 p = vec2((vUv.x - 0.5) * 2.6, (vUv.y - 0.45) * 1.4);
 
-    float d = length(p);
-    float wave = sin(d * 3.2 - uTime * 0.65) * 0.5 + cos(p.x * 2.0 + uTime * 0.35) * 0.5;
+    float r = max(0.06, length(p));
+    float angle = atan(p.y, p.x);
+    float depth = 1.05 / r + uScroll;
+    float twist = angle + sin(depth * 0.42 - uTime * 0.45) * (0.22 + uMid * 0.28);
 
-    vec3 deepBg = vec3(0.03, 0.05, 0.12);
-    vec3 cyanTint = vec3(0.0, 0.42, 0.58);
-    vec3 violetTint = vec3(0.28, 0.10, 0.48);
+    // Continuous trig coordinates (zero atan wrap seam) + screen-space 1px hairline widths
+    float ring = depth * 2.0;
+    float spokeSin = sin(twist * 8.0);
+    float ringSin = sin(ring * 3.14159265);
 
-    vec3 col = mix(deepBg, violetTint, smoothstep(-0.6, 0.6, wave));
-    col = mix(col, cyanTint, smoothstep(0.25, 0.95, wave) * (0.35 + uBass * 0.45));
+    float spokeFW = clamp(fwidth(spokeSin), 0.004, 0.14);
+    float ringRawFW = fwidth(ring);
+    float ringFW = clamp(ringRawFW, 0.004, 0.14);
 
-    float vignette = smoothstep(1.85, 0.25, length(p));
-    float alpha = vignette * (0.22 + uRms * 0.35);
+    float secSign = smoothstep(-spokeFW, spokeFW, spokeSin);
+    float ringSign = smoothstep(-ringFW * 2.0, ringFW * 2.0, ringSin);
+    float checker = mix(ringSign, 1.0 - ringSign, secSign);
+
+    float spokeLine = 1.0 - smoothstep(0.0, spokeFW * 1.15, abs(spokeSin));
+    float dRing = abs(fract(ring + 0.5) - 0.5);
+    // Fade rings smoothly before they pack tighter than ~3px near the center
+    float ringDensityFade = smoothstep(0.24, 0.05, ringRawFW);
+    float ringLine = (1.0 - smoothstep(0.0, ringFW * 1.15, dRing)) * ringDensityFade;
+    float gridLine = clamp(max(spokeLine, ringLine), 0.0, 1.0);
+
+    float bandNorm = abs(angle) / 3.14159265;
+    float bandVal = sampleTunnelBand(bandNorm);
+    float pulseWave = pow(0.5 + 0.5 * sin(ring * 1.5707963 - uTime * 3.5), 4.0) * uBass;
+
+    // Subdued deep indigo / violet tunnel palette so the cyan + magenta centerpiece pops
+    vec3 tileA = vec3(0.04, 0.05, 0.14);
+    vec3 tileB = vec3(0.07, 0.09, 0.22);
+    vec3 baseCol = mix(tileA, tileB, checker);
+    vec3 lineCol = mix(
+      vec3(0.24, 0.36, 0.84),
+      vec3(0.56, 0.30, 0.88),
+      clamp(0.5 + 0.5 * sin(ring * 0.65 - uTime * 0.7) + bandVal * 0.4, 0.0, 1.0)
+    );
+    vec3 bandGlow = vec3(0.28, 0.38, 0.92) * bandVal * (0.28 + gridLine * 0.65);
+
+    vec3 col =
+      baseCol * (0.55 + uRms * 0.35 + bandVal * 0.45) +
+      lineCol * gridLine * (0.52 + uBass * 0.45 + uHigh * 0.35 + pulseWave * 0.75) +
+      bandGlow;
+
+    // Keep a darker pocket directly behind the spinning icosahedron
+    float innerVoid = smoothstep(0.16, 0.36, r);
+    float outerFade = smoothstep(1.38, 0.48, r);
+    float bottomFade = smoothstep(0.0, 0.14, vUv.y);
+    float mask = innerVoid * outerFade * bottomFade;
+    float alpha = clamp(mask * (0.48 + gridLine * 0.34 + bandVal * 0.18 + uRms * 0.12), 0.0, 0.84);
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -175,7 +227,7 @@ const PLASMA_FRAG = /* glsl */ `
 export class BackdropManager {
   public readonly group = new THREE.Group();
 
-  private mode: BackdropMode = 'outrun';
+  private mode: BackdropMode = 'demoscene';
   private elapsed = 0;
   private horizonZ = -LOOKAHEAD_STEPS * STEP_Z_SPACING - 6;
 
@@ -201,19 +253,26 @@ export class BackdropManager {
   private waterfallHistory: Float32Array[] = [];
   private waterfallTimer = 0;
 
-  // 3. Demoscene Pixel-Tunnel + Morphing Geometry
+  // 3. Demoscene Crisp Polar Tunnel + Morphing Geometry
   private demosceneGroup = new THREE.Group();
   private demosceneUniforms = {
     uTime: { value: 0 },
+    uScroll: { value: 0 },
     uBass: { value: 0 },
     uMid: { value: 0 },
     uHigh: { value: 0 },
     uRms: { value: 0 },
+    uBands: { value: new Array<number>(16).fill(0) },
   };
   private demoIco!: THREE.LineSegments;
+  private demoIcoCore!: THREE.Mesh;
   private demoTorus!: THREE.LineSegments;
   private icoBasePos!: Float32Array;
   private icoGeo!: THREE.BufferGeometry;
+  private icoCoreBasePos!: Float32Array;
+  private icoCoreGeo!: THREE.BufferGeometry;
+  private tunnelScroll = 0;
+  private punchBass = 0;
 
   // 4. Hyperspace Warp Gates & Pixel Starfield
   private hyperspaceGroup = new THREE.Group();
@@ -262,7 +321,7 @@ export class BackdropManager {
       this.scopeGroup,
       this.plasmaGroup
     );
-    this.setMode('outrun');
+    this.setMode('demoscene');
   }
 
   public setMode(mode: BackdropMode): void {
@@ -352,21 +411,22 @@ export class BackdropManager {
     }
   }
 
-  // ---- 3. Demoscene Pixel-Tunnel + Morphing Geometry ----
+  // ---- 3. Demoscene Crisp Polar Tunnel + Morphing Geometry + Expanding Pulse Rings ----
   private buildDemoscene(): void {
-    const bgGeo = new THREE.PlaneGeometry(88, 36);
+    const bgGeo = new THREE.PlaneGeometry(148, 52);
     const bgMat = new THREE.ShaderMaterial({
       vertexShader: BASIC_VERT,
-      fragmentShader: DEMOSCENE_FRAG,
+      fragmentShader: DEMOSCENE_TUNNEL_FRAG,
       uniforms: this.demosceneUniforms,
       transparent: true,
       depthWrite: false,
       fog: false,
     });
     const bg = new THREE.Mesh(bgGeo, bgMat);
-    bg.position.set(0, 12, this.horizonZ - 6);
+    bg.position.set(0, 13.5, this.horizonZ - 8);
     this.demosceneGroup.add(bg);
 
+    const heroZ = this.horizonZ + 4;
     const rawIco = new THREE.IcosahedronGeometry(5.5, 1);
     const edgesIco = new THREE.EdgesGeometry(rawIco);
     this.icoGeo = edgesIco;
@@ -376,17 +436,35 @@ export class BackdropManager {
 
     this.demoIco = new THREE.LineSegments(
       this.icoGeo,
-      new THREE.LineBasicMaterial({ color: '#00f0ff', fog: false })
+      new THREE.LineBasicMaterial({ color: '#38f8ff', fog: false })
     );
-    this.demoIco.position.set(0, 11.5, this.horizonZ + 4);
+    this.demoIco.position.set(0, 11.5, heroZ);
     this.demosceneGroup.add(this.demoIco);
+
+    // Solid dark occlusion core so tunnel lines never tangle behind front edges of the icosahedron
+    this.icoCoreGeo = new THREE.IcosahedronGeometry(5.32, 1);
+    const corePos = this.icoCoreGeo.attributes.position as THREE.BufferAttribute;
+    this.icoCoreBasePos = new Float32Array(corePos.array.length);
+    this.icoCoreBasePos.set(corePos.array as Float32Array);
+    this.demoIcoCore = new THREE.Mesh(
+      this.icoCoreGeo,
+      new THREE.MeshBasicMaterial({
+        color: '#05070e',
+        polygonOffset: true,
+        polygonOffsetFactor: 2,
+        polygonOffsetUnits: 2,
+        fog: false,
+      })
+    );
+    this.demoIcoCore.position.set(0, 11.5, heroZ);
+    this.demosceneGroup.add(this.demoIcoCore);
 
     const torusEdges = new THREE.EdgesGeometry(new THREE.TorusGeometry(9.2, 0.9, 8, 24));
     this.demoTorus = new THREE.LineSegments(
       torusEdges,
-      new THREE.LineBasicMaterial({ color: '#ff2e93', fog: false })
+      new THREE.LineBasicMaterial({ color: '#ff3fa4', fog: false })
     );
-    this.demoTorus.position.set(0, 11.5, this.horizonZ + 4);
+    this.demoTorus.position.set(0, 11.5, heroZ);
     this.demosceneGroup.add(this.demoTorus);
     rawIco.dispose();
   }
@@ -556,6 +634,35 @@ export class BackdropManager {
     this.plasmaGroup.add(mesh);
   }
 
+  private morphIcoGeo(geo: THREE.BufferGeometry, basePos: Float32Array, spike: number, high: number): void {
+    const pos = geo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      const bx = basePos[i * 3]!;
+      const by = basePos[i * 3 + 1]!;
+      const bz = basePos[i * 3 + 2]!;
+      const wobble = 1 + Math.sin(bx * 0.9 + this.elapsed * 5.0) * high * 0.25;
+      const s = spike * wobble;
+      pos.setXYZ(i, bx * s, by * s, bz * s);
+    }
+    pos.needsUpdate = true;
+  }
+
+  private updateDemoHero(dt: number, bass: number, high: number, rms: number): void {
+    const spin = 0.35 + rms * 2.2;
+    this.demoIco.rotation.x += dt * spin * 0.8;
+    this.demoIco.rotation.y += dt * spin;
+    this.demoIcoCore.rotation.copy(this.demoIco.rotation);
+    this.demoTorus.rotation.x -= dt * spin * 0.55;
+    this.demoTorus.rotation.z += dt * spin * 0.7;
+
+    const torusScale = 1 + bass * 0.18;
+    this.demoTorus.scale.set(torusScale, torusScale, torusScale);
+
+    const spike = 1 + bass * 0.45 + high * 0.35;
+    this.morphIcoGeo(this.icoGeo, this.icoBasePos, spike, high);
+    this.morphIcoGeo(this.icoCoreGeo, this.icoCoreBasePos, spike, high);
+  }
+
   // ---------------------------------------------------------------------------
   // Per-Frame Update (only active mode updates)
   // ---------------------------------------------------------------------------
@@ -631,29 +738,30 @@ export class BackdropManager {
         pos.needsUpdate = true;
       }
     } else if (this.mode === 'demoscene') {
+      const kPunch = 1 - Math.exp(-dt * (rawBass > this.punchBass ? 26 : 9));
+      this.punchBass += (rawBass - this.punchBass) * kPunch;
+      this.tunnelScroll += dt * (0.75 + rms * 2.2 + this.punchBass * 2.6);
+
       this.demosceneUniforms.uTime.value = this.elapsed;
-      this.demosceneUniforms.uBass.value = bass;
+      this.demosceneUniforms.uScroll.value = this.tunnelScroll;
+      this.demosceneUniforms.uBass.value = this.punchBass;
       this.demosceneUniforms.uMid.value = mid;
       this.demosceneUniforms.uHigh.value = high;
       this.demosceneUniforms.uRms.value = rms;
 
-      const spin = 0.35 + rms * 2.2;
-      this.demoIco.rotation.x += dt * spin * 0.8;
-      this.demoIco.rotation.y += dt * spin;
-      this.demoTorus.rotation.x -= dt * spin * 0.55;
-      this.demoTorus.rotation.z += dt * spin * 0.7;
-
-      const pos = this.icoGeo.attributes.position as THREE.BufferAttribute;
-      const spike = 1 + bass * 0.45 + high * 0.35;
-      for (let i = 0; i < pos.count; i++) {
-        const bx = this.icoBasePos[i * 3]!;
-        const by = this.icoBasePos[i * 3 + 1]!;
-        const bz = this.icoBasePos[i * 3 + 2]!;
-        const wobble = 1 + Math.sin(bx * 0.9 + this.elapsed * 5.0) * high * 0.25;
-        const s = spike * wobble;
-        pos.setXYZ(i, bx * s, by * s, bz * s);
+      const arr = this.demosceneUniforms.uBands.value;
+      if (analysis) {
+        for (let i = 0; i < 16; i++) {
+          const bPrev = analysis.bands[Math.max(0, i - 1)] ?? 0;
+          const bCurr = analysis.bands[i] ?? 0;
+          const bNext = analysis.bands[Math.min(19, i + 1)] ?? 0;
+          arr[i] = bPrev * 0.25 + bCurr * 0.5 + bNext * 0.25;
+        }
+      } else {
+        arr.fill(0);
       }
-      pos.needsUpdate = true;
+
+      this.updateDemoHero(dt, this.punchBass, high, rms);
     } else if (this.mode === 'hyperspace') {
       const speed = 14 + rms * 75 + bass * 55;
       this.starMat.size = 0.45 + bass * 0.7 + rms * 0.35;

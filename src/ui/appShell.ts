@@ -79,7 +79,7 @@ export class AppShell {
 
           <div class="control-group">
             <span>OFFSET</span>
-            <input type="range" min="-300" max="300" step="1" value="0" data-role="latency" style="width:90px" />
+            <input type="range" min="-500" max="500" step="1" value="0" data-role="latency" style="width:90px" />
             <span data-role="latency-val">0ms</span>
             <button class="btn" data-role="auto-align" title="Detect first audio transient">AUTO</button>
           </div>
@@ -120,9 +120,9 @@ export class AppShell {
           <div class="control-group">
             <span>BACKDROP</span>
             <select data-role="backdrop-mode">
-              <option value="outrun" selected>Outrun Sun</option>
+              <option value="outrun">Outrun Sun</option>
               <option value="waterfall">Joy Division</option>
-              <option value="demoscene">Demoscene</option>
+              <option value="demoscene" selected>Demoscene</option>
               <option value="hyperspace">Hyperspace</option>
               <option value="oscilloscope">Oscilloscope</option>
               <option value="plasma">Plasma Cloud</option>
@@ -133,9 +133,9 @@ export class AppShell {
           <div class="control-group">
             <span>SECTIONS</span>
             <select data-role="pattern-display">
-              <option value="gantries" selected>Gantries</option>
+              <option value="gantries">Gantries</option>
               <option value="marquee">Fly-Through Laser</option>
-              <option value="chromatic">Chromatic Slam</option>
+              <option value="chromatic" selected>Chromatic Slam</option>
               <option value="none">None</option>
             </select>
           </div>
@@ -212,7 +212,7 @@ export class AppShell {
             <ol class="help-steps">
               <li><strong>Export your audio:</strong> Render your master <code>.wav</code> on the Tracker (into <code>/Export/</code> or inside your project folder).</li>
               <li><strong>Load a project:</strong> Click <strong>MOUNT TRACKER</strong> (Chrome/Edge) to select your SD card root or <code>/Projects</code> folder, then use <strong>PROJECTS</strong> or <strong>LOAD LATEST</strong> — or use <strong>OPEN FOLDER</strong> + <strong>LOAD WAV</strong> for a single project folder.</li>
-              <li><strong>Sync playback:</strong> Press <strong>Space</strong> or <strong>▶ PLAY</strong>. If your WAV has leading silence, click <strong>AUTO</strong> or fine-tune <strong>OFFSET</strong> (<code>-300ms</code> to <code>+300ms</code>).</li>
+              <li><strong>Sync playback:</strong> Press <strong>Space</strong> or <strong>▶ PLAY</strong>. If your WAV has leading silence, click <strong>AUTO</strong> or fine-tune <strong>OFFSET</strong> (<code>-500ms</code> to <code>+500ms</code>).</li>
               <li><strong>Customize &amp; label:</strong> Adjust <strong>LANES</strong>, <strong>CAM</strong> (including panning modes like <code>Classic ↔ Side</code> and <code>Cinema Orbit</code>), <strong>BACKDROP</strong>, and <strong>SECTIONS</strong>. Click <strong>NAMES</strong> to rename tracks and patterns (saved in browser storage).</li>
               <li><strong>Clean preview &amp; export:</strong> Press <strong>H</strong> (or <strong>HIDE UI</strong>) to preview the clean render. Click <strong>EXPORT MP4</strong> <em>(recommended)</em> for 1920×1080 60fps H.264/AAC video with HUD, <strong>EXPORT WEBM</strong> for VP9/Opus, or <strong>ALPHA</strong> + <strong>● LIVE REC</strong> for transparent <code>.webm</code> overlays.</li>
             </ol>

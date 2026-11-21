@@ -20,7 +20,7 @@ interface GantryInstance {
 export class PatternGantries {
   public readonly group = new THREE.Group();
 
-  private mode: PatternDisplayMode = 'gantries';
+  private mode: PatternDisplayMode = 'chromatic';
 
   // 1. Gantries
   private gantryGroup = new THREE.Group();
@@ -49,7 +49,7 @@ export class PatternGantries {
     this.buildChromaticSlam();
 
     this.group.add(this.gantryGroup, this.marqueeGroup, this.chromaticGroup);
-    this.setDisplayMode('gantries');
+    this.setDisplayMode('chromatic');
   }
 
   private buildGantries(): void {

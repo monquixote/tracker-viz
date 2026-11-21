@@ -7,6 +7,7 @@ import { LiveRecorder } from './export/liveRecorder.ts';
 import { isWebCodecsSupported, runOfflineExport, type OfflineFormat } from './export/offlineExporter.ts';
 import { TRACK_HEX_PALETTE } from './scene/constants.ts';
 import { HighwayScene } from './scene/highwayScene.ts';
+import { BUNDLED_DEMO_LATENCY_OFFSET_MS, loadBundledDemoFiles } from './tracker/bundledDemo.ts';
 import { generateDemoProject } from './tracker/demoProject.ts';
 import {
   collectFilesFromFileList,
@@ -211,7 +212,7 @@ async function bootstrap(): Promise<void> {
         return;
       }
       // If WAV starts at firstTransient and note is at firstNoteSec, offset = (firstNoteSec - firstTransient) * 1000
-      const offsetMs = Math.max(-300, Math.min(300, (firstNoteSec - firstTransient) * 1000));
+      const offsetMs = Math.max(-500, Math.min(500, (firstNoteSec - firstTransient) * 1000));
       audioEngine.setLatencyOffsetMs(offsetMs);
       shell.setLatencyOffsetMs(offsetMs);
       markDirty(0.2);
@@ -453,15 +454,38 @@ async function bootstrap(): Promise<void> {
       audioBuffer = await audioEngine.loadWavFile(discovered.wavFile);
     }
 
+    audioEngine.setLatencyOffsetMs(0);
+    shell.setLatencyOffsetMs(0);
     await applyTimeline(timeline, audioBuffer);
     shell.hideToast();
   }
 
   async function loadDemo(): Promise<void> {
-    shell.showToast('Synthesizing demo project & audio...');
-    const demo = await generateDemoProject();
-    await applyTimeline(demo.timeline, demo.audioBuffer);
-    shell.hideToast();
+    try {
+      shell.showToast('Loading Oceanic Frogs demo...');
+      const discovered = await loadBundledDemoFiles();
+      const parsed = await parseDiscoveredProject(discovered);
+      const timeline = compileTrackerProject(parsed);
+      const audioBuffer = discovered.wavFile
+        ? await audioEngine.loadWavFile(discovered.wavFile)
+        : null;
+
+      await applyTimeline(timeline, audioBuffer);
+      audioEngine.setLatencyOffsetMs(BUNDLED_DEMO_LATENCY_OFFSET_MS);
+      shell.setLatencyOffsetMs(BUNDLED_DEMO_LATENCY_OFFSET_MS);
+      shell.hideToast();
+    } catch (err) {
+      console.warn(
+        '[tracker-viz] Failed to load bundled demo, falling back to procedural demo:',
+        err
+      );
+      audioEngine.setLatencyOffsetMs(0);
+      shell.setLatencyOffsetMs(0);
+      shell.showToast('Synthesizing demo project & audio...');
+      const demo = await generateDemoProject();
+      await applyTimeline(demo.timeline, demo.audioBuffer);
+      shell.hideToast();
+    }
   }
 
   // Keyboard shortcuts: Space (Play/Pause), H (Hide/Show UI), ? (Help)
